@@ -1,0 +1,10 @@
+type Result = variant { Ok : UserProfile; Err : text };
+type Result_1 = variant { Ok : vec record { text; UserProfile }; Err : text };
+type Result_2 = variant { Ok; Err : text };
+type UserProfile = record { avatar_url : text; name : text; address : text };
+service : {
+  get_my_profile : () -> (Result) query;
+  list_profiles : () -> (Result_1) query;
+  save_my_profile : (text, text) -> (Result);
+  send_raw_transaction : (text) -> (Result_2);
+}

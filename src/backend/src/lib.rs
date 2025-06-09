@@ -1,0 +1,509 @@
+mod declarations;
+mod service;
+mod user_profile;
+
+use candid::{CandidType, Principal};
+use ic_cdk::api::call::call_with_payment128;
+use ic_cdk::{export_candid, update};
+use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
+use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap};
+use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use user_profile::UserProfile;
+
+type Memory = VirtualMemory<DefaultMemoryImpl>;
+
+thread_local! {
+    static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
+        RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
+
+    static USER_PROFILES: RefCell<StableBTreeMap<String, UserProfile, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0))),
+        )
+    );
+}
+
+const EVM_CANISTER_ID: &str = "7hfb6-caaaa-aaaar-qadga-cai";
+const GAS_FEE: u128 = 1_000_000_000_000;
+
+use num_bigint::BigUint;
+pub type Nat = BigUint;
+pub type Nat64 = u64;
+pub type Nat32 = u32;
+pub type Nat8 = u8;
+pub type Nat16 = u16;
+pub type Int64 = i64;
+
+#[derive(Serialize, Deserialize)]
+pub struct Block {
+    pub miner: String,
+    pub total_difficulty: Option<Nat>,
+    pub receipts_root: String,
+    pub state_root: String,
+    pub hash: String,
+    pub difficulty: Option<Nat>,
+    pub size: Nat,
+    pub uncles: Vec<String>,
+    pub base_fee_per_gas: Option<Nat>,
+    pub extra_data: String,
+    pub transactions_root: Option<String>,
+    pub sha3_uncles: String,
+    pub nonce: Nat,
+    pub number: Nat,
+    pub timestamp: Nat,
+    pub transactions: Vec<String>,
+    pub gas_limit: Nat,
+    pub logs_bloom: String,
+    pub parent_hash: String,
+    pub gas_used: Nat,
+    pub mix_hash: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum BlockTag {
+    Earliest,
+    Safe,
+    Finalized,
+    Latest,
+    Number(Nat),
+    Pending,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub enum EthMainnetService {
+    Alchemy,
+    Ankr,
+    BlockPi,
+    Cloudflare,
+    PublicNode,
+    Llama,
+}
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub enum EthSepoliaService {
+    Alchemy,
+    Ankr,
+    BlockPi,
+    PublicNode,
+    Sepolia,
+}
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub enum L2MainnetService {
+    Alchemy,
+    Ankr,
+    BlockPi,
+    PublicNode,
+    Llama,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FeeHistory {
+    pub reward: Vec<Vec<Nat>>,
+    pub gas_used_ratio: Vec<f64>,
+    pub oldest_block: Nat,
+    pub base_fee_per_gas: Vec<Nat>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FeeHistoryArgs {
+    pub block_count: Nat,
+    pub newest_block: BlockTag,
+    pub reward_percentiles: Option<Vec<Nat8>>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetLogsArgs {
+    pub from_block: Option<BlockTag>,
+    pub to_block: Option<BlockTag>,
+    pub addresses: Vec<String>,
+    pub topics: Option<Vec<Topic>>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetTransactionCountArgs {
+    pub address: String,
+    pub block: BlockTag,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CallArgs {
+    pub transaction: TransactionRequest,
+    pub block: Option<BlockTag>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TransactionRequest {
+    #[serde(rename = "type")]
+    pub tx_type: Option<String>,
+    pub nonce: Option<Nat>,
+    pub to: Option<String>,
+    pub from: Option<String>,
+    pub gas: Option<Nat>,
+    pub value: Option<Nat>,
+    pub input: Option<String>,
+    pub gas_price: Option<Nat>,
+    pub max_priority_fee_per_gas: Option<Nat>,
+    pub max_fee_per_gas: Option<Nat>,
+    pub max_fee_per_blob_gas: Option<Nat>,
+    pub access_list: Option<Vec<AccessListEntry>>,
+    pub blob_versioned_hashes: Option<Vec<String>>,
+    pub blobs: Option<Vec<String>>,
+    pub chain_id: Option<Nat>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AccessListEntry {
+    pub address: String,
+    pub storage_keys: Vec<String>,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub struct HttpHeader {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub enum HttpOutcallError {
+    IcError {
+        code: RejectionCode,
+        message: String,
+    },
+    InvalidHttpJsonRpcResponse {
+        status: Nat16,
+        body: String,
+        parsing_error: Option<String>,
+    },
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct InstallArgs {
+    pub demo: Option<bool>,
+    pub manage_api_keys: Option<Vec<String>>, // principal as String
+    pub log_filter: Option<LogFilter>,
+    pub override_provider: Option<OverrideProvider>,
+    pub nodes_in_subnet: Option<Nat32>,
+}
+
+pub type Regex = String;
+
+#[derive(Serialize, Deserialize)]
+pub enum LogFilter {
+    ShowAll,
+    HideAll,
+    ShowPattern(Regex),
+    HidePattern(Regex),
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct RegexSubstitution {
+    pub pattern: Regex,
+    pub replacement: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct OverrideProvider {
+    pub override_url: Option<RegexSubstitution>,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub struct JsonRpcError {
+    pub code: Int64,
+    pub message: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct LogEntry {
+    pub transaction_hash: Option<String>,
+    pub block_number: Option<Nat>,
+    pub data: String,
+    pub block_hash: Option<String>,
+    pub transaction_index: Option<Nat>,
+    pub topics: Vec<String>,
+    pub address: String,
+    pub log_index: Option<Nat>,
+    pub removed: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Metrics {
+    pub requests: Vec<((String, String), u64)>,
+    pub responses: Vec<((String, String, String), u64)>,
+    pub inconsistent_responses: Vec<((String, String), u64)>,
+    pub cycles_charged: Vec<((String, String), Nat)>,
+    pub err_http_outcall: Vec<((String, String, RejectionCode), u64)>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum MultiFeeHistoryResult {
+    Consistent(FeeHistoryResult),
+    Inconsistent(Vec<(RpcService, FeeHistoryResult)>),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum MultiGetBlockByNumberResult {
+    Consistent(GetBlockByNumberResult),
+    Inconsistent(Vec<(RpcService, GetBlockByNumberResult)>),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum MultiGetLogsResult {
+    Consistent(GetLogsResult),
+    Inconsistent(Vec<(RpcService, GetLogsResult)>),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum MultiGetTransactionCountResult {
+    Consistent(GetTransactionCountResult),
+    Inconsistent(Vec<(RpcService, GetTransactionCountResult)>),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum MultiGetTransactionReceiptResult {
+    Consistent(GetTransactionReceiptResult),
+    Inconsistent(Vec<(RpcService, GetTransactionReceiptResult)>),
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub enum MultiSendRawTransactionResult {
+    Consistent(SendRawTransactionResult),
+    Inconsistent(Vec<(RpcService, SendRawTransactionResult)>),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum MultiCallResult {
+    Consistent(CallResult),
+    Inconsistent(Vec<(RpcService, CallResult)>),
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub enum ProviderError {
+    TooFewCycles { expected: String, received: String },
+    MissingRequiredProvider,
+    ProviderNotFound,
+    NoPermission,
+    InvalidRpcConfig(String),
+}
+
+pub type ProviderId = Nat64;
+pub type ChainId = Nat64;
+
+#[derive(Serialize, Deserialize)]
+pub struct Provider {
+    pub provider_id: ProviderId,
+    pub chain_id: ChainId,
+    pub access: RpcAccess,
+    pub alias: Option<RpcService>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum RpcAccess {
+    Authenticated {
+        auth: RpcAuth,
+        public_url: Option<String>,
+    },
+    Unauthenticated {
+        public_url: String,
+    },
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum RpcAuth {
+    BearerToken { url: String },
+    UrlParameter { url_pattern: String },
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub enum RejectionCode {
+    NoError,
+    CanisterError,
+    SysTransient,
+    DestinationInvalid,
+    Unknown,
+    SysFatal,
+    CanisterReject,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum FeeHistoryResult {
+    Ok(FeeHistory),
+    Err(RpcError),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum GetBlockByNumberResult {
+    Ok(Block),
+    Err(RpcError),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum GetLogsResult {
+    Ok(Vec<LogEntry>),
+    Err(RpcError),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum GetTransactionCountResult {
+    Ok(Nat),
+    Err(RpcError),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum GetTransactionReceiptResult {
+    Ok(Option<TransactionReceipt>),
+    Err(RpcError),
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub enum SendRawTransactionResult {
+    Ok(SendRawTransactionStatus),
+    Err(RpcError),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum CallResult {
+    Ok(String),
+    Err(RpcError),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum RequestResult {
+    Ok(String),
+    Err(RpcError),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum RequestCostResult {
+    Ok(Nat),
+    Err(RpcError),
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct RpcConfig {
+    pub response_size_estimate: Option<Nat64>,
+    pub response_consensus: Option<ConsensusStrategy>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum ConsensusStrategy {
+    Equality,
+    Threshold { total: Option<Nat8>, min: Nat8 },
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub enum ValidationError {
+    Custom(String),
+    InvalidHex(String),
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub enum RpcError {
+    JsonRpcError(JsonRpcError),
+    ProviderError(ProviderError),
+    ValidationError(ValidationError),
+    HttpOutcallError(HttpOutcallError),
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub struct RpcApi {
+    pub url: String,
+    pub headers: Option<Vec<HttpHeader>>,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub enum RpcService {
+    Provider(ProviderId),
+    Custom(RpcApi),
+    EthSepolia(EthSepoliaService),
+    EthMainnet(EthMainnetService),
+    ArbitrumOne(L2MainnetService),
+    BaseMainnet(L2MainnetService),
+    OptimismMainnet(L2MainnetService),
+}
+
+#[derive(CandidType, Serialize, Deserialize)]
+pub enum RpcServices {
+    Custom {
+        chainId: ChainId,
+        services: Vec<RpcApi>,
+    },
+    EthSepolia(Option<Vec<EthSepoliaService>>),
+    EthMainnet(Option<Vec<EthMainnetService>>),
+    ArbitrumOne(Option<Vec<L2MainnetService>>),
+    BaseMainnet(Option<Vec<L2MainnetService>>),
+    OptimismMainnet(Option<Vec<L2MainnetService>>),
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug)]
+pub enum SendRawTransactionStatus {
+    Ok(Option<String>),
+    NonceTooLow,
+    NonceTooHigh,
+    InsufficientFunds,
+}
+
+pub type Topic = Vec<String>;
+
+#[derive(Serialize, Deserialize)]
+pub struct TransactionReceipt {
+    pub to: Option<String>,
+    pub status: Option<Nat>,
+    pub transaction_hash: String,
+    pub block_number: Nat,
+    pub from: String,
+    pub logs: Vec<LogEntry>,
+    pub block_hash: String,
+    #[serde(rename = "type")]
+    pub tx_type: String,
+    pub transaction_index: Nat,
+    pub effective_gas_price: Nat,
+    pub logs_bloom: String,
+    pub contract_address: Option<String>,
+    pub gas_used: Nat,
+}
+
+#[update]
+async fn send_raw_transaction(rawSignedTransactionHex: String) -> Result<String, String> {
+    let RpcServices: RpcServices = RpcServices::Custom {
+        chainId: ChainId::from(1u64),
+        services: vec![RpcApi {
+            url: "https://ethereum-sepolia-rpc.publicnode.com".to_string(),
+            headers: None,
+        }],
+    };
+
+    let cycles = 10_000_000_000;
+    let canister_id =
+        Principal::from_text("7hfb6-caaaa-aaaar-qadga-cai").expect("principal should be valid");
+    let RpcConfig: Option<()> = None;
+    let args = (RpcServices, RpcConfig, rawSignedTransactionHex);
+
+    let result: (MultiSendRawTransactionResult,) =
+        call_with_payment128(canister_id, "eth_sendRawTransaction", args, cycles)
+            .await
+            .expect("Failed to call eth_sendRawTransaction");
+
+    match result.0 {
+        MultiSendRawTransactionResult::Consistent(SendRawTransactionResult::Ok(status)) => {
+            match status {
+                SendRawTransactionStatus::Ok(Some(tx_hash)) => Ok(tx_hash),
+                SendRawTransactionStatus::Ok(None) => {
+                    Err("Transaction succeeded but tx_hash missing".to_string())
+                }
+                SendRawTransactionStatus::NonceTooLow => Err("Nonce too low".to_string()),
+                SendRawTransactionStatus::NonceTooHigh => Err("Nonce too high".to_string()),
+                SendRawTransactionStatus::InsufficientFunds => {
+                    Err("Insufficient funds".to_string())
+                }
+            }
+        }
+        MultiSendRawTransactionResult::Consistent(SendRawTransactionResult::Err(e)) => {
+            Err(format!("SendRawTransaction failed: {:?}", e))
+        }
+        MultiSendRawTransactionResult::Inconsistent(_) => {
+            Err("Transaction is inconsistent".to_string())
+        }
+    }
+}
+
+export_candid!();
