@@ -11,6 +11,11 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use user_profile::UserProfile;
 
+use ic_cdk::api::management_canister::ecdsa::ecdsa_public_key;
+use ic_cdk::api::management_canister::ecdsa::EcdsaCurve;
+use ic_cdk::api::management_canister::ecdsa::EcdsaKeyId;
+use ic_cdk::api::management_canister::ecdsa::EcdsaPublicKeyArgument;
+
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
 thread_local! {
@@ -23,9 +28,6 @@ thread_local! {
         )
     );
 }
-
-const EVM_CANISTER_ID: &str = "7hfb6-caaaa-aaaar-qadga-cai";
-const GAS_FEE: u128 = 1_000_000_000_000;
 
 use num_bigint::BigUint;
 pub type Nat = BigUint;
@@ -463,11 +465,12 @@ pub struct TransactionReceipt {
 }
 
 #[update]
-async fn send_raw_transaction(rawSignedTransactionHex: String) -> Result<String, String> {
+pub async fn send_raw_transaction(rawSignedTransactionHex: String) -> Result<String, String> {
     let RpcServices: RpcServices = RpcServices::Custom {
         chainId: ChainId::from(1u64),
         services: vec![RpcApi {
-            url: "https://eth-sepolia.g.alchemy.com/v2/qAGTv97zMDFslX0PDeLawNZw0wDToCu3".to_string(),
+            url: "https://eth-sepolia.g.alchemy.com/v2/qAGTv97zMDFslX0PDeLawNZw0wDToCu3"
+                .to_string(),
             headers: None,
         }],
     };
@@ -506,8 +509,6 @@ async fn send_raw_transaction(rawSignedTransactionHex: String) -> Result<String,
     }
 }
 
-export_candid!();
-
 
 // pub async fn send_raw_transaction(network: String, raw_tx: String) -> SendRawTransactionStatus {
 //     let config = None;
@@ -533,3 +534,26 @@ export_candid!();
 //         Err(e) => ic_cdk::trap(format!("Error: {:?}", e).as_str()),
 //     }
 // }
+
+#[update]
+pub async fn get_ecdsa_public_key() -> Result<Vec<u8>, String> {
+    let key_id = EcdsaKeyId {
+        curve: EcdsaCurve::Secp256k1,
+        name: "key_1".to_string(),
+    };
+    let derivation_path: Vec<Vec<u8>> = vec![];
+    let arg = EcdsaPublicKeyArgument {
+        key_id,
+        derivation_path,
+        canister_id: None,
+    };
+
+    let (resp,) = ecdsa_public_key(arg)
+        .await
+        .map_err(|e| format!("Failed to get public key: {:?}", e))?;
+
+    Ok(resp.public_key)
+}
+
+
+export_candid!();

@@ -7,7 +7,7 @@ import {
   createUseActorHook,
   isIdentityExpiredError,
 } from "ic-use-actor";
-import { canisterId, idlFactory } from "../../../declarations/backend/index";
+import { canisterId, idlFactory } from "../../../declarations/backend/index.js";
 
 import { ReactNode } from "react";
 import { _SERVICE } from "../../../declarations/backend/backend.did";

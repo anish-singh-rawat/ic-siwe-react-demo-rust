@@ -2,11 +2,11 @@
 
 # dfx build ic_siwe_provider 
 
-dfx deps pull
+# dfx deps pull
 
-dfx deps init evm_rpc --argument '(record {})' 
+# dfx deps init evm_rpc --argument '(record {})' 
 
-dfx deps deploy
+# dfx deps deploy
 
 # dfx generate ic_siwe_provider 
 
@@ -14,14 +14,17 @@ dfx deps deploy
 
 # dfx generate frontend 
 
-# cargo build --release --target wasm32-unknown-unknown --package backend
-
-# candid-extractor target/wasm32-unknown-unknown/release/backend.wasm >src/declarations/backend/backend.did
 dfx canister uninstall-code 7cdn3-haaaa-aaaad-aaoja-cai --ic
 
 dfx canister uninstall-code 7fclp-kyaaa-aaaad-aaojq-cai --ic
 
 dfx canister uninstall-code 7qf2c-lqaaa-aaaad-aaoka-cai --ic
+
+cargo build --release --target wasm32-unknown-unknown --package backend
+
+candid-extractor target/wasm32-unknown-unknown/release/backend.wasm >src/backend/backend.did
+
+dfx generate backend 
 
 dfx deploy ic_siwe_provider --argument='(
   record {

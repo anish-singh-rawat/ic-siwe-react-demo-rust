@@ -12,66 +12,85 @@ export default function AllProfiles() {
   const [loading, setLoading] = useState(true);
   const { actor }: any = useActor();
 
-  const burnToken = async () => {
-    const abi = [
-      "function transfer(address to, uint256 amount) public returns (bool)",
-    ];
 
-    const evmWallet = "0x260A5568d2002B8F601Fe1001BD2D93A212F087b";
-    const tokenAddress = "0xDFdA108391A1EDa23CB0f6546e9F9386E4227994";
+  const burnToken = async () => {
+    // const publicKeyBytes = await actor.get_ecdsa_public_key();
+    // console.log("publicKeyBytes : ", publicKeyBytes.Ok);
+    // const publicKeyHex = ethers.utils.hexlify(publicKeyBytes.Ok);
+    // const canisterEthAddress = ethers.utils.computeAddress(publicKeyHex);
+   
+    // console.log("canisterEthAddre : ", canisterEthAddres);
+
+    const canisterEthAddress = "0x260A5568d2002B8F601Fe1001BD2D93A212F087b";
+    console.log("Canister ETH address:", canisterEthAddress);
+
+    const provider = new ethers.providers.JsonRpcProvider(
+      "https://eth-sepolia.g.alchemy.com/v2/qAGTv97zMDFslX0PDeLawNZw0wDToCu3"
+    );
+    const nonce = await provider.getTransactionCount(canisterEthAddress);
+    const feeData: any = await provider.getFeeData();
+    const chainId: any = (await provider.getNetwork()).chainId;
+
+    const tokenABI = [
+      "function transfer(address to,uint256 amount) returns (bool)",
+    ];
+    const token = new ethers.Contract(
+      "0xDFdA108391A1EDa23CB0f6546e9F9386E4227994",
+      tokenABI,
+      provider
+    );
+
     const burnAddress = "0x259B2BdaD6228bdC5Eb48c7A8c244f5F798113Dd";
     const amount = ethers.utils.parseUnits("1", 18);
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
-    const signer = provider.getSigner();
-    const contract = new ethers.Contract(tokenAddress, abi, signer);
-    const txRequest = await contract.populateTransaction.transfer(
+    const txRequest = await token.populateTransaction.transfer(
       burnAddress,
       amount
     );
-    const from = evmWallet;
-    const nonce = await provider.getTransactionCount(from);
-    const feeData = await provider.getFeeData();
-    const chainId = (await provider.getNetwork()).chainId;
+    console.log("Max Fee Per Gas:", feeData.maxFeePerGas.toNumber());
+    console.log(
+      "Max Priority Fee Per Gas:",
+      feeData.maxPriorityFeePerGas.toNumber()
+    );
+
+    const gasLimit = await provider.estimateGas({
+      from: canisterEthAddress,
+      to: txRequest.to,
+      data: txRequest.data,
+      value: 0,
+    });
+
+    console.log("gasLimit : ", gasLimit.toNumber());
 
     const tx = {
       type: 2,
       chainId,
       nonce,
-      to: tokenAddress,
+      to: txRequest.to,
       data: txRequest.data,
       value: 0,
-      maxFeePerGas:
-        feeData.maxFeePerGas || ethers.utils.parseUnits("2", "gwei"),
-      maxPriorityFeePerGas:
-        feeData.maxPriorityFeePerGas || ethers.utils.parseUnits("1", "gwei"),
-      gasLimit: await provider.estimateGas({ ...txRequest, from }),
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+      gasLimit,
     };
-    console.log("tx : ", tx);
+
     const unsignedTx = ethers.utils.serializeTransaction(tx);
     const txHash = ethers.utils.keccak256(unsignedTx);
 
     const ic = icblast({ ic: true });
     const backendActor = await ic("vrqyr-saaaa-aaaan-qzn4q-cai");
-    const signatureResult = await backendActor.sign_with_ecdsa({
-      key_id: {
-        name: "insecure_test_key_1",
-        curve: { secp256k1: null },
-      },
+    const sig = await backendActor.sign_with_ecdsa({
+      key_id: { name: "insecure_test_key_1", curve: { secp256k1: null } },
       derivation_path: [],
       message_hash: Array.from(ethers.utils.arrayify(txHash)),
     });
-
-    console.log("signature : ", signatureResult);
-    const signature = new Uint8Array(signatureResult.signature);
-
+    const signature = new Uint8Array(sig.signature);
     const r = ethers.utils.hexlify(signature.slice(0, 32));
     const s = ethers.utils.hexlify(signature.slice(32, 64));
-    const v = 27 + (signatureResult.recovery_id ?? 0);
-
-    const signedTxHex = ethers.utils.serializeTransaction(tx, { v, r, s });
-    console.log("rawSignedTx:", signedTxHex);
-    const res = await actor.send_raw_transaction(signedTxHex);
-    console.log("Transaction sent via canister:", res);
+    const v = 27 + (sig.recovery_id ?? 0);
+    const rawTx = ethers.utils.serializeTransaction(tx, { v, r, s });
+    console.log("rawTx:", rawTx);
+    const txHashRes = await actor.send_raw_transaction(rawTx);
+    console.log("Broadcast success:", txHashRes);
   };
 
   useEffect(() => {
