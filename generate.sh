@@ -17,11 +17,11 @@ dfx deps deploy
 # cargo build --release --target wasm32-unknown-unknown --package backend
 
 # candid-extractor target/wasm32-unknown-unknown/release/backend.wasm >src/declarations/backend/backend.did
-# dfx canister uninstall-code 7cdn3-haaaa-aaaad-aaoja-cai --ic
+dfx canister uninstall-code 7cdn3-haaaa-aaaad-aaoja-cai --ic
 
-# dfx canister uninstall-code 7fclp-kyaaa-aaaad-aaojq-cai --ic
+dfx canister uninstall-code 7fclp-kyaaa-aaaad-aaojq-cai --ic
 
-# dfx canister uninstall-code 7qf2c-lqaaa-aaaad-aaoka-cai --ic
+dfx canister uninstall-code 7qf2c-lqaaa-aaaad-aaoka-cai --ic
 
 dfx deploy ic_siwe_provider --argument='(
   record {

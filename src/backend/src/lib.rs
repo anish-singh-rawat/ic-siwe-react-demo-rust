@@ -467,12 +467,12 @@ async fn send_raw_transaction(rawSignedTransactionHex: String) -> Result<String,
     let RpcServices: RpcServices = RpcServices::Custom {
         chainId: ChainId::from(1u64),
         services: vec![RpcApi {
-            url: "https://ethereum-sepolia-rpc.publicnode.com".to_string(),
+            url: "https://eth-sepolia.g.alchemy.com/v2/qAGTv97zMDFslX0PDeLawNZw0wDToCu3".to_string(),
             headers: None,
         }],
     };
 
-    let cycles = 10_000_000_000;
+    let cycles = 2_000_000_000_000;
     let canister_id =
         Principal::from_text("7hfb6-caaaa-aaaar-qadga-cai").expect("principal should be valid");
     let RpcConfig: Option<()> = None;
@@ -507,3 +507,29 @@ async fn send_raw_transaction(rawSignedTransactionHex: String) -> Result<String,
 }
 
 export_candid!();
+
+
+// pub async fn send_raw_transaction(network: String, raw_tx: String) -> SendRawTransactionStatus {
+//     let config = None;
+//     let services = match network.as_str() {
+//         "EthSepolia" => RpcServices::EthSepolia(Some(vec![EthSepoliaService::Alchemy])),
+//         "EthMainnet" => RpcServices::EthMainnet(None),
+//         _ => RpcServices::EthSepolia(None),
+//     };
+
+//     let cycles = 20000000;
+//     match EvmRpcCanister::eth_send_raw_transaction(services, config, raw_tx, cycles).await {
+//         Ok((res,)) => match res {
+//             MultiSendRawTransactionResult::Consistent(status) => match status {
+//                 SendRawTransactionResult::Ok(status) => status,
+//                 SendRawTransactionResult::Err(e) => {
+//                     ic_cdk::trap(format!("Error: {:?}", e).as_str());
+//                 }
+//             },
+//             MultiSendRawTransactionResult::Inconsistent(_) => {
+//                 ic_cdk::trap("Status is inconsistent");
+//             }
+//         },
+//         Err(e) => ic_cdk::trap(format!("Error: {:?}", e).as_str()),
+//     }
+// }
