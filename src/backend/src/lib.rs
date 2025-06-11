@@ -507,8 +507,8 @@ fn normalize_symbol(symbol: &str) -> String {
 
 
 #[update]
-pub async fn send_raw_transaction(rawSignedTransactionHex: String) -> Result<String, String> {
-    let RpcServices: RpcServices = RpcServices::Custom {
+pub async fn send_raw_transaction(raw_signed_transaction_hex: String) -> Result<String, String> {
+    let rpc_services: RpcServices = RpcServices::Custom {
         chainId: ChainId::from(1u64),
         services: vec![RpcApi {
             url: "https://eth-sepolia.g.alchemy.com/v2/qAGTv97zMDFslX0PDeLawNZw0wDToCu3"
@@ -520,8 +520,8 @@ pub async fn send_raw_transaction(rawSignedTransactionHex: String) -> Result<Str
     let cycles = 2_000_000_000_000;
     let canister_id =
         Principal::from_text("7hfb6-caaaa-aaaar-qadga-cai").expect("principal should be valid");
-    let RpcConfig: Option<()> = None;
-    let args = (RpcServices, RpcConfig, rawSignedTransactionHex);
+    let rpc_config: Option<()> = None;
+    let args = (rpc_services, rpc_config, raw_signed_transaction_hex);
 
     let result: (MultiSendRawTransactionResult,) =
         call_with_payment128(canister_id, "eth_sendRawTransaction", args, cycles)

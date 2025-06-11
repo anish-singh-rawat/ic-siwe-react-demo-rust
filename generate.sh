@@ -41,6 +41,6 @@ dfx generate backend
 #   }
 # )' --ic
 
-# dfx deploy backend --ic
+dfx deploy backend --ic
 
-# dfx deploy frontend --ic
+dfx deploy frontend --ic

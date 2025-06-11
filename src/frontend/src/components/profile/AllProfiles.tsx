@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BigNumber, ethers } from "ethers";
+import { ethers } from "ethers";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import ProfileCard from "./ProfileCard";
 import { UserProfile } from "../../../../declarations/backend/backend.did";
