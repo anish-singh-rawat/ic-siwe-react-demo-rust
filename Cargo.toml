@@ -1,5 +1,6 @@
 [workspace]
-members = [
-    "src/backend",
-]
+members = ["src/backend"]
 resolver = "2"
+
+[workspace.dependencies]
+ic-xrc-types = "1.0.0"

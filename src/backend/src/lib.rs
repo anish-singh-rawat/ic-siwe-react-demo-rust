@@ -4,17 +4,20 @@ mod user_profile;
 
 use candid::{CandidType, Principal};
 use ic_cdk::api::call::call_with_payment128;
-use ic_cdk::{export_candid, update};
-use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
-use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap};
-use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
-use user_profile::UserProfile;
-
 use ic_cdk::api::management_canister::ecdsa::ecdsa_public_key;
 use ic_cdk::api::management_canister::ecdsa::EcdsaCurve;
 use ic_cdk::api::management_canister::ecdsa::EcdsaKeyId;
 use ic_cdk::api::management_canister::ecdsa::EcdsaPublicKeyArgument;
+use ic_cdk::api::time;
+use ic_cdk::{export_candid, update};
+use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
+use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap};
+use ic_xrc_types::{Asset, AssetClass, GetExchangeRateRequest, GetExchangeRateResult};
+use num_traits::cast::ToPrimitive;
+
+use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use user_profile::UserProfile;
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
@@ -464,6 +467,45 @@ pub struct TransactionReceipt {
     pub gas_used: Nat,
 }
 
+#[derive(CandidType, Serialize, Deserialize, Debug, Clone)]
+pub enum Error {
+    EmptyAsset,
+    InvalidAssetLength,
+    ExchangeRateError(String),
+    CallFailed(String),
+}
+
+pub const NANOS_PER_SECOND: u128 = 1_000_000_000u128;
+pub const XRC_CYCLES_FEE: u128 = 1_000_000_000u128;
+pub const SCALING_FACTOR: u128 = 100_000_000;
+pub const MAX_ASSET_LENGTH: usize = 7;
+
+pub fn validate_asset_name(asset_name: &str) -> Result<(), Error> {
+    if asset_name.trim().is_empty() {
+        return Err(Error::EmptyAsset);
+    }
+    if asset_name.len() > MAX_ASSET_LENGTH {
+        return Err(Error::InvalidAssetLength);
+    }
+
+    Ok(())
+}
+
+pub fn current_timestamp() -> u64 {
+    time() / NANOS_PER_SECOND as u64
+}
+
+fn normalize_symbol(symbol: &str) -> String {
+    match symbol {
+        "ckBTC" => "btc".to_string(),
+        "ckETH" => "eth".to_string(),
+        "ckUSDC" => "usdc".to_string(),
+        "ckUSDT" => "usdt".to_string(),
+        _ => symbol.to_string(),
+    }
+}
+
+
 #[update]
 pub async fn send_raw_transaction(rawSignedTransactionHex: String) -> Result<String, String> {
     let RpcServices: RpcServices = RpcServices::Custom {
@@ -509,32 +551,6 @@ pub async fn send_raw_transaction(rawSignedTransactionHex: String) -> Result<Str
     }
 }
 
-
-// pub async fn send_raw_transaction(network: String, raw_tx: String) -> SendRawTransactionStatus {
-//     let config = None;
-//     let services = match network.as_str() {
-//         "EthSepolia" => RpcServices::EthSepolia(Some(vec![EthSepoliaService::Alchemy])),
-//         "EthMainnet" => RpcServices::EthMainnet(None),
-//         _ => RpcServices::EthSepolia(None),
-//     };
-
-//     let cycles = 20000000;
-//     match EvmRpcCanister::eth_send_raw_transaction(services, config, raw_tx, cycles).await {
-//         Ok((res,)) => match res {
-//             MultiSendRawTransactionResult::Consistent(status) => match status {
-//                 SendRawTransactionResult::Ok(status) => status,
-//                 SendRawTransactionResult::Err(e) => {
-//                     ic_cdk::trap(format!("Error: {:?}", e).as_str());
-//                 }
-//             },
-//             MultiSendRawTransactionResult::Inconsistent(_) => {
-//                 ic_cdk::trap("Status is inconsistent");
-//             }
-//         },
-//         Err(e) => ic_cdk::trap(format!("Error: {:?}", e).as_str()),
-//     }
-// }
-
 #[update]
 pub async fn get_ecdsa_public_key() -> Result<Vec<u8>, String> {
     let key_id = EcdsaKeyId {
@@ -555,5 +571,83 @@ pub async fn get_ecdsa_public_key() -> Result<Vec<u8>, String> {
     Ok(resp.public_key)
 }
 
+#[update]
+pub async fn get_exchange_rates(
+    base_asset_symbol: String,
+    quote_asset_symbol: Option<String>,
+    amount: candid::Nat,
+) -> Result<(String, u64), Error> {
+    validate_asset_name(&base_asset_symbol)?;
+    if let Some(ref symbol) = quote_asset_symbol {
+        validate_asset_name(symbol)?;
+    }
+
+    let base_asset = normalize_symbol(&base_asset_symbol);
+    let quote_asset = normalize_symbol(&quote_asset_symbol.unwrap_or_else(|| "USDT".to_string()));
+
+    let args = GetExchangeRateRequest {
+        timestamp: None,
+        quote_asset: Asset {
+            class: if quote_asset.to_uppercase() == "USD" {
+                AssetClass::FiatCurrency
+            } else {
+                AssetClass::Cryptocurrency
+            },
+            symbol: quote_asset.clone(),
+        },
+        base_asset: Asset {
+            class: if base_asset.to_uppercase() == "USD" {
+                AssetClass::FiatCurrency
+            } else {
+                AssetClass::Cryptocurrency
+            },
+            symbol: base_asset.clone(),
+        },
+    };
+
+    let xrc_canister_id: Principal = Principal::from_text("uf6dk-hyaaa-aaaaq-qaaaq-cai").unwrap();
+
+    let res = ic_cdk::api::call::call_with_payment128(
+        xrc_canister_id,
+        "get_exchange_rate",
+        (args,),
+        XRC_CYCLES_FEE,
+    )
+    .await;
+
+    let response = match res {
+        Ok((GetExchangeRateResult::Ok(v),)) => v,
+        Ok((GetExchangeRateResult::Err(e),)) => {
+            return Err(Error::ExchangeRateError(format!(
+                "Exchange rate error: {:?}",
+                e
+            )));
+        }
+        Err(e) => {
+            return Err(Error::CallFailed(format!("Call failed: {:?}", e)));
+        }
+    };
+
+    // let quote = response.rate;
+    // let pow = 10u64.pow(response.metadata.decimals);
+    // let exchange_rate = (candid::Nat::from(quote) * candid::Nat::from(SCALING_FACTOR)) / candid::Nat::from(pow);
+
+    // ic_cdk::println!(" exchange_rate : {:?} ",exchange_rate);
+
+    // let total_value: candid::Nat = (candid::Nat::from(quote) * amount) / candid::Nat::from(pow);
+    // let time = current_timestamp();
+
+    let quote = response.rate;
+    let pow = 10u64.pow(response.metadata.decimals);
+
+    let quote_f64 = quote as f64;
+    let pow_f64 = pow as f64;
+    let amount_f64 = amount.0.to_f64().unwrap_or(0.0);
+
+    let total_value_f64 = (quote_f64 * amount_f64) / pow_f64;
+    let time = current_timestamp();
+
+    Ok((total_value_f64.to_string(), time))
+}
 
 export_candid!();
