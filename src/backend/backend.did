@@ -1,20 +1,46 @@
+type AssetData = variant {
+  CustomPriceFeed : record {
+    decimals : nat64;
+    rate : nat64;
+    timestamp : nat64;
+    symbol : text;
+  };
+  CustomNumber : record { id : text; decimals : nat64; value : nat64 };
+  DefaultPriceFeed : record {
+    decimals : nat64;
+    rate : nat64;
+    timestamp : nat64;
+    symbol : text;
+  };
+  CustomString : record { id : text; value : text };
+};
+type AssetDataResult = record { signature : opt text; data : AssetData };
 type Error = variant {
   CallFailed : text;
   ExchangeRateError : text;
   InvalidAssetLength;
   EmptyAsset;
 };
-type Result = variant { Ok : blob; Err : text };
-type Result_1 = variant { Ok : record { text; nat64 }; Err : Error };
-type Result_2 = variant { Ok : UserProfile; Err : text };
-type Result_3 = variant { Ok : vec record { text; UserProfile }; Err : text };
-type Result_4 = variant { Ok : text; Err : text };
+type GetAssetDataWithProofResponse = variant {
+  Ok : AssetDataResult;
+  Err : text;
+};
+type Result = variant {
+  Ok : record { GetAssetDataWithProofResponse };
+  Err : text;
+};
+type Result_1 = variant { Ok : blob; Err : text };
+type Result_2 = variant { Ok : record { text; nat64 }; Err : Error };
+type Result_3 = variant { Ok : UserProfile; Err : text };
+type Result_4 = variant { Ok : vec record { text; UserProfile }; Err : text };
+type Result_5 = variant { Ok : text; Err : text };
 type UserProfile = record { avatar_url : text; name : text; address : text };
 service : {
-  get_ecdsa_public_key : () -> (Result);
-  get_exchange_rates : (text, opt text, nat) -> (Result_1);
-  get_my_profile : () -> (Result_2) query;
-  list_profiles : () -> (Result_3) query;
-  save_my_profile : (text, text) -> (Result_2);
-  send_raw_transaction : (text) -> (Result_4);
+  get_asset_data_with_proof : (text, opt text, opt text) -> (Result);
+  get_ecdsa_public_key : () -> (Result_1);
+  get_exchange_rates : (text, opt text, nat) -> (Result_2);
+  get_my_profile : () -> (Result_3) query;
+  list_profiles : () -> (Result_4) query;
+  save_my_profile : (text, text) -> (Result_3);
+  send_raw_transaction : (text) -> (Result_5);
 }

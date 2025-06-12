@@ -14,19 +14,11 @@ export default function AllProfiles() {
 
 
     const burnToken = async () => {
-      // const publicKeyBytes = await actor.get_ecdsa_public_key();
-      // console.log("publicKeyBytes : ", publicKeyBytes.Ok);
-      // const publicKeyHex = ethers.utils.hexlify(publicKeyBytes.Ok);
-      // const canisterEthAddress = ethers.utils.computeAddress(publicKeyHex);
-    
-      // console.log("canisterEthAddre : ", canisterEthAddres);
-
       const canisterEthAddress = "0x260A5568d2002B8F601Fe1001BD2D93A212F087b";
-      console.log("Canister ETH address:", canisterEthAddress);
-
       const provider = new ethers.providers.JsonRpcProvider(
         "https://eth-sepolia.g.alchemy.com/v2/qAGTv97zMDFslX0PDeLawNZw0wDToCu3"
       );
+      
       const nonce = await provider.getTransactionCount(canisterEthAddress);
       const feeData: any = await provider.getFeeData();
       const chainId: any = (await provider.getNetwork()).chainId;
@@ -47,10 +39,7 @@ export default function AllProfiles() {
         amount
       );
       console.log("Max Fee Per Gas:", feeData.maxFeePerGas.toNumber());
-      console.log(
-        "Max Priority Fee Per Gas:",
-        feeData.maxPriorityFeePerGas.toNumber()
-      );
+      console.log("Max Priority Fee Per Gas:",feeData.maxPriorityFeePerGas.toNumber());
 
       const gasLimit = await provider.estimateGas({
         from: canisterEthAddress,
@@ -59,11 +48,9 @@ export default function AllProfiles() {
         value: 0,
       });
 
-      // const bigNum = BigNumber.from("0x6337");
       const tx = {
         type: 2,
         chainId,
-        // gasPrice : bigNum,
         nonce,
         to: txRequest.to,
         data: txRequest.data,
@@ -78,11 +65,13 @@ export default function AllProfiles() {
 
       const ic = icblast({ ic: true });
       const backendActor = await ic("vrqyr-saaaa-aaaan-qzn4q-cai");
+      
       const sig = await backendActor.sign_with_ecdsa({
         key_id: { name: "insecure_test_key_1", curve: { secp256k1: null } },
         derivation_path: [],
         message_hash: Array.from(ethers.utils.arrayify(txHash)),
       });
+      
       const signature = new Uint8Array(sig.signature);
       const r = ethers.utils.hexlify(signature.slice(0, 32));
       const s = ethers.utils.hexlify(signature.slice(32, 64));

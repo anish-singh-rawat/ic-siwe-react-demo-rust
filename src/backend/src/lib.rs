@@ -506,10 +506,29 @@ fn normalize_symbol(symbol: &str) -> String {
 }
 
 
+#[derive(CandidType, Serialize, Deserialize, Debug, Clone)]
+pub enum AssetData {
+  CustomPriceFeed{ decimals: u64, rate: u64, timestamp: u64, symbol: String },
+  CustomNumber{ id: String, decimals: u64, value: u64 },
+  DefaultPriceFeed{ decimals: u64, rate: u64, timestamp: u64, symbol: String },
+  CustomString{ id: String, value: String },
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug, Clone)]
+pub struct AssetDataResult {
+  pub signature: Option<String>,
+  pub data: AssetData,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug, Clone)]
+pub enum GetAssetDataWithProofResponse { Ok(AssetDataResult), Err(String) }
+
+
+
 #[update]
 pub async fn send_raw_transaction(raw_signed_transaction_hex: String) -> Result<String, String> {
     let rpc_services: RpcServices = RpcServices::Custom {
-        chainId: ChainId::from(1u64),
+        chainId: ChainId::from(11155111u64),
         services: vec![RpcApi {
             url: "https://eth-sepolia.g.alchemy.com/v2/qAGTv97zMDFslX0PDeLawNZw0wDToCu3"
                 .to_string(),
@@ -648,6 +667,26 @@ pub async fn get_exchange_rates(
     let time = current_timestamp();
 
     Ok((total_value_f64.to_string(), time))
+}
+
+#[update]
+pub async fn get_asset_data_with_proof(
+    arg0: String,
+    arg1: Option<String>,
+    arg2: Option<String>,
+) -> Result<(GetAssetDataWithProofResponse,), String> {
+    let xrc_canister_id: Principal = Principal::from_text("wth3l-tiaaa-aaaap-aa5uq-cai")
+        .map_err(|e| format!("Invalid principal: {}", e))?;
+
+    let res: Result<(GetAssetDataWithProofResponse,), _> = call_with_payment128(
+        xrc_canister_id,
+        "get_asset_data_with_proof",
+        (arg0, arg1, arg2),
+        XRC_CYCLES_FEE,
+    )
+    .await;
+
+    res.map_err(|e| format!("Inter-canister call failed: {:?}", e))
 }
 
 export_candid!();
