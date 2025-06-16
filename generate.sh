@@ -14,11 +14,11 @@
 
 # dfx generate frontend 
 
-dfx canister uninstall-code 7cdn3-haaaa-aaaad-aaoja-cai --ic
+# dfx canister uninstall-code 7cdn3-haaaa-aaaad-aaoja-cai --ic
 
-dfx canister uninstall-code 7fclp-kyaaa-aaaad-aaojq-cai --ic
+# dfx canister uninstall-code 7fclp-kyaaa-aaaad-aaojq-cai --ic
 
-dfx canister uninstall-code 7qf2c-lqaaa-aaaad-aaoka-cai --ic
+# dfx canister uninstall-code 7qf2c-lqaaa-aaaad-aaoka-cai --ic
 
 cargo build --release --target wasm32-unknown-unknown --package backend
 

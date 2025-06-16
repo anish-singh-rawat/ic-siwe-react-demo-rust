@@ -12,37 +12,53 @@ export default function AllProfiles() {
   const [loading, setLoading] = useState(true);
   const { actor }: any = useActor();
 
+  const burnToken = async () => {
+    try {
+      const sendAddress = "0x259B2BdaD6228bdC5Eb48c7A8c244f5F798113Dd";
+      const tokenAddress = "0xDFdA108391A1EDa23CB0f6546e9F9386E4227994";
+      const MyEthWalletAddress = "0x260A5568d2002B8F601Fe1001BD2D93A212F087b";
+      const amount = ethers.utils.parseUnits("1", 18);
+      const browserProvider = new ethers.providers.Web3Provider(
+      window.ethereum);
+      await browserProvider.send("eth_requestAccounts", []);
+      const signer = browserProvider.getSigner();
 
-    const burnToken = async () => {
-      const canisterEthAddress = "0x260A5568d2002B8F601Fe1001BD2D93A212F087b";
+      const tokenABI = [
+        "function approve(address spender, uint256 amount) public returns (bool)",
+        "function transferFrom(address from, address to, uint256 amount) public returns (bool)",
+      ];
+
+      const tokenWithSigner = new ethers.Contract(
+        tokenAddress,
+        tokenABI,
+        signer
+      );
+      const approveTx = await tokenWithSigner.approve(sendAddress, amount);
+
+      await approveTx.wait();
+      
+
       const provider = new ethers.providers.JsonRpcProvider(
         "https://eth-sepolia.g.alchemy.com/v2/qAGTv97zMDFslX0PDeLawNZw0wDToCu3"
       );
-      
-      const nonce = await provider.getTransactionCount(canisterEthAddress);
-      const feeData: any = await provider.getFeeData();
-      const chainId: any = (await provider.getNetwork()).chainId;
 
-      const tokenABI = [
-        "function transfer(address to,uint256 amount) returns (bool)",
-      ];
-      const token = new ethers.Contract(
-        "0xDFdA108391A1EDa23CB0f6546e9F9386E4227994",
+      const nonce = await provider.getTransactionCount(MyEthWalletAddress);
+      const feeData: any = await provider.getFeeData();
+      const chainId = (await provider.getNetwork()).chainId;
+
+      const tokenReadOnly = new ethers.Contract(
+        tokenAddress,
         tokenABI,
         provider
       );
-
-      const burnAddress = "0x259B2BdaD6228bdC5Eb48c7A8c244f5F798113Dd";
-      const amount = ethers.utils.parseUnits("1", 18);
-      const txRequest = await token.populateTransaction.transfer(
-        burnAddress,
+      const txRequest = await tokenReadOnly.populateTransaction.transferFrom(
+        MyEthWalletAddress,
+        sendAddress,
         amount
       );
-      console.log("Max Fee Per Gas:", feeData.maxFeePerGas.toNumber());
-      console.log("Max Priority Fee Per Gas:",feeData.maxPriorityFeePerGas.toNumber());
 
       const gasLimit = await provider.estimateGas({
-        from: canisterEthAddress,
+        from: MyEthWalletAddress,
         to: txRequest.to,
         data: txRequest.data,
         value: 0,
@@ -65,22 +81,25 @@ export default function AllProfiles() {
 
       const ic = icblast({ ic: true });
       const backendActor = await ic("vrqyr-saaaa-aaaan-qzn4q-cai");
-      
+
       const sig = await backendActor.sign_with_ecdsa({
         key_id: { name: "insecure_test_key_1", curve: { secp256k1: null } },
         derivation_path: [],
         message_hash: Array.from(ethers.utils.arrayify(txHash)),
       });
-      
+
       const signature = new Uint8Array(sig.signature);
       const r = ethers.utils.hexlify(signature.slice(0, 32));
       const s = ethers.utils.hexlify(signature.slice(32, 64));
       const v = 27 + (sig.recovery_id ?? 0);
       const rawTx = ethers.utils.serializeTransaction(tx, { v, r, s });
-      console.log("rawTx:", rawTx);
+
       const txHashRes = await actor.send_raw_transaction(rawTx);
-      console.log("Broadcast success:", txHashRes);
-    };
+      console.log("Response :", txHashRes);
+    } catch (error) {
+      console.log("error : ", error);
+    }
+  };
 
   useEffect(() => {
     if (!actor) return;
