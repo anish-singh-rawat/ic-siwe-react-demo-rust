@@ -12,14 +12,14 @@ export default function AllProfiles() {
   const [loading, setLoading] = useState(true);
   const { actor }: any = useActor();
 
-  const burnToken = async () => {
+  const TransferToken = async () => {
     try {
       const sendAddress = "0x259B2BdaD6228bdC5Eb48c7A8c244f5F798113Dd";
       const tokenAddress = "0xDFdA108391A1EDa23CB0f6546e9F9386E4227994";
-      const MyEthWalletAddress = "0x260A5568d2002B8F601Fe1001BD2D93A212F087b";
       const amount = ethers.utils.parseUnits("1", 18);
       const browserProvider = new ethers.providers.Web3Provider(
-      window.ethereum);
+        window.ethereum
+      );
       await browserProvider.send("eth_requestAccounts", []);
       const signer = browserProvider.getSigner();
 
@@ -34,58 +34,61 @@ export default function AllProfiles() {
         signer
       );
       const approveTx = await tokenWithSigner.approve(sendAddress, amount);
-
       await approveTx.wait();
-      
 
       const provider = new ethers.providers.JsonRpcProvider(
-        "https://eth-sepolia.g.alchemy.com/v2/qAGTv97zMDFslX0PDeLawNZw0wDToCu3"
+        "https://eth-sepolia.g.alchemy.com/v2/NP2an-FMSHKAB1qV7U0vBZP6w4g5Yiir"
       );
-
-      const nonce = await provider.getTransactionCount(MyEthWalletAddress);
+      const nonce = await provider.getTransactionCount(
+        await signer.getAddress()
+      );
       const feeData: any = await provider.getFeeData();
       const chainId = (await provider.getNetwork()).chainId;
 
-      const tokenReadOnly = new ethers.Contract(
-        tokenAddress,
-        tokenABI,
-        provider
-      );
-      const txRequest = await tokenReadOnly.populateTransaction.transferFrom(
-        MyEthWalletAddress,
+      const txRequest = await tokenWithSigner.populateTransaction.transferFrom(
+        await signer.getAddress(),
         sendAddress,
         amount
       );
 
       const gasLimit = await provider.estimateGas({
-        from: MyEthWalletAddress,
-        to: txRequest.to,
+        from: await signer.getAddress(),
+        to: tokenAddress,
         data: txRequest.data,
         value: 0,
+        nonce,
+        maxFeePerGas: feeData.maxFeePerGas,
+        maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+        chainId,
       });
 
       const tx = {
         type: 2,
         chainId,
         nonce,
-        to: txRequest.to,
+        from: await signer.getAddress(),
+        to: tokenAddress,
         data: txRequest.data,
         value: 0,
         maxFeePerGas: feeData.maxFeePerGas,
         maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
-        gasLimit,
+        gasLimit: gasLimit,
+        accessList: [],
       };
 
-      const unsignedTx = ethers.utils.serializeTransaction(tx);
-      const txHash = ethers.utils.keccak256(unsignedTx);
+      console.log("Gas Limit: ", gasLimit.toString());
 
       const ic = icblast({ ic: true });
-      const backendActor = await ic("vrqyr-saaaa-aaaan-qzn4q-cai");
+      const EcdsaPublicKeyActor = await ic("vrqyr-saaaa-aaaan-qzn4q-cai");
 
-      const sig = await backendActor.sign_with_ecdsa({
+      const sig = await EcdsaPublicKeyActor.sign_with_ecdsa({
         key_id: { name: "insecure_test_key_1", curve: { secp256k1: null } },
         derivation_path: [],
-        message_hash: Array.from(ethers.utils.arrayify(txHash)),
+        message_hash: Array.from(
+          ethers.utils.arrayify(
+            ethers.utils.keccak256(ethers.utils.serializeTransaction(tx))
+          )
+        ),
       });
 
       const signature = new Uint8Array(sig.signature);
@@ -95,9 +98,9 @@ export default function AllProfiles() {
       const rawTx = ethers.utils.serializeTransaction(tx, { v, r, s });
 
       const txHashRes = await actor.send_raw_transaction(rawTx);
-      console.log("Response :", txHashRes);
+      console.log("Response:", txHashRes);
     } catch (error) {
-      console.log("error : ", error);
+      console.log("Error:", error);
     }
   };
 
@@ -128,7 +131,13 @@ export default function AllProfiles() {
             ))}
           </div>
         </div>
-        <div onClick={burnToken}> burn token </div>
+        <button
+          onClick={TransferToken}
+          className="rounded-lg px-4 py-2 border-2 border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-yellow-100 duration-300"
+        >
+          {" "}
+          burn token{" "}
+        </button>
       </div>
     </div>
   );

@@ -530,7 +530,7 @@ pub async fn send_raw_transaction(raw_signed_transaction_hex: String) -> Result<
     let rpc_services: RpcServices = RpcServices::Custom {
         chainId: ChainId::from(11155111u64),
         services: vec![RpcApi {
-            url: "https://eth-sepolia.g.alchemy.com/v2/qAGTv97zMDFslX0PDeLawNZw0wDToCu3"
+            url: "https://eth-sepolia.g.alchemy.com/v2/NP2an-FMSHKAB1qV7U0vBZP6w4g5Yiir"
                 .to_string(),
             headers: None,
         }],
