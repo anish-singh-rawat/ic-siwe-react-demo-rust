@@ -4,10 +4,6 @@ mod user_profile;
 
 use candid::{CandidType, Principal};
 use ic_cdk::api::call::call_with_payment128;
-use ic_cdk::api::management_canister::ecdsa::ecdsa_public_key;
-use ic_cdk::api::management_canister::ecdsa::EcdsaCurve;
-use ic_cdk::api::management_canister::ecdsa::EcdsaKeyId;
-use ic_cdk::api::management_canister::ecdsa::EcdsaPublicKeyArgument;
 use ic_cdk::api::time;
 use ic_cdk::{export_candid, update};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
@@ -570,25 +566,6 @@ pub async fn send_raw_transaction(raw_signed_transaction_hex: String) -> Result<
     }
 }
 
-#[update]
-pub async fn get_ecdsa_public_key() -> Result<Vec<u8>, String> {
-    let key_id = EcdsaKeyId {
-        curve: EcdsaCurve::Secp256k1,
-        name: "key_1".to_string(),
-    };
-    let derivation_path: Vec<Vec<u8>> = vec![];
-    let arg = EcdsaPublicKeyArgument {
-        key_id,
-        derivation_path,
-        canister_id: None,
-    };
-
-    let (resp,) = ecdsa_public_key(arg)
-        .await
-        .map_err(|e| format!("Failed to get public key: {:?}", e))?;
-
-    Ok(resp.public_key)
-}
 
 #[update]
 pub async fn get_exchange_rates(
@@ -667,26 +644,6 @@ pub async fn get_exchange_rates(
     let time = current_timestamp();
 
     Ok((total_value_f64.to_string(), time))
-}
-
-#[update]
-pub async fn get_asset_data_with_proof(
-    arg0: String,
-    arg1: Option<String>,
-    arg2: Option<String>,
-) -> Result<(GetAssetDataWithProofResponse,), String> {
-    let xrc_canister_id: Principal = Principal::from_text("wth3l-tiaaa-aaaap-aa5uq-cai")
-        .map_err(|e| format!("Invalid principal: {}", e))?;
-
-    let res: Result<(GetAssetDataWithProofResponse,), _> = call_with_payment128(
-        xrc_canister_id,
-        "get_asset_data_with_proof",
-        (arg0, arg1, arg2),
-        XRC_CYCLES_FEE,
-    )
-    .await;
-
-    res.map_err(|e| format!("Inter-canister call failed: {:?}", e))
 }
 
 export_candid!();

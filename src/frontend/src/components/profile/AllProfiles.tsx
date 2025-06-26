@@ -15,9 +15,9 @@ export default function AllProfiles() {
     try {
       const tokenAddress = "0xDFdA108391A1EDa23CB0f6546e9F9386E4227994";
       const receiver = "0x259B2BdaD6228bdC5Eb48c7A8c244f5F798113Dd";
+      const amountToSend = "1";
   
       await window.ethereum.request({ method: "eth_requestAccounts" });
-      const amountToSend = "1";
   
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
@@ -390,7 +390,7 @@ export default function AllProfiles() {
       const decimals = await contract.decimals();
       const balances = await contract.balanceOf(sender);
   
-      console.log("balances : ", balances);
+      console.log("balances : ", ethers.utils.formatEther(balances));
   
       const contractWithSigner = contract.connect(signer);
   
@@ -407,6 +407,7 @@ export default function AllProfiles() {
         blockNumber,
         confirmations,
         wait,
+        transactionIndex,
         creates,
         ...filteredTx
       } = tx;
