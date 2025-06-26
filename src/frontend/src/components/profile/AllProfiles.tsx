@@ -5,7 +5,6 @@ import ProfileCard from "./ProfileCard";
 import { UserProfile } from "../../../../declarations/backend/backend.did";
 import { faCircleNotch } from "@fortawesome/free-solid-svg-icons";
 import { useActor } from "../../ic/Actors";
-import icblast from "@infu/icblast";
 
 export default function AllProfiles() {
   const [profiles, setProfiles] = useState<[string, UserProfile][]>([]);
@@ -14,93 +13,420 @@ export default function AllProfiles() {
 
   const TransferToken = async () => {
     try {
-      const sendAddress = "0x259B2BdaD6228bdC5Eb48c7A8c244f5F798113Dd";
       const tokenAddress = "0xDFdA108391A1EDa23CB0f6546e9F9386E4227994";
-      const amount = ethers.utils.parseUnits("1", 18);
-      const browserProvider = new ethers.providers.Web3Provider(
-        window.ethereum
-      );
-      await browserProvider.send("eth_requestAccounts", []);
-      const signer = browserProvider.getSigner();
-
-      const tokenABI = [
-        "function approve(address spender, uint256 amount) public returns (bool)",
-        "function transferFrom(address from, address to, uint256 amount) public returns (bool)",
+      const receiver = "0x259B2BdaD6228bdC5Eb48c7A8c244f5F798113Dd";
+  
+      await window.ethereum.request({ method: "eth_requestAccounts" });
+      const amountToSend = "1";
+  
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+  
+      const sender = await signer.getAddress();
+  
+      console.log("address : ", sender);
+  
+      const balance = await provider.getBalance(sender);
+  
+      const balanceInEth = ethers.utils.formatEther(balance);
+  
+      console.log("balanceInEth : ", balanceInEth);
+  
+      const tokenAbi = [
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "_name",
+              type: "string",
+            },
+            {
+              internalType: "string",
+              name: "_symbol",
+              type: "string",
+            },
+            {
+              internalType: "uint256",
+              name: "_initialSupply",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "spender",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "allowance",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "needed",
+              type: "uint256",
+            },
+          ],
+          name: "ERC20InsufficientAllowance",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "sender",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "balance",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "needed",
+              type: "uint256",
+            },
+          ],
+          name: "ERC20InsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "approver",
+              type: "address",
+            },
+          ],
+          name: "ERC20InvalidApprover",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "receiver",
+              type: "address",
+            },
+          ],
+          name: "ERC20InvalidReceiver",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "sender",
+              type: "address",
+            },
+          ],
+          name: "ERC20InvalidSender",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "spender",
+              type: "address",
+            },
+          ],
+          name: "ERC20InvalidSpender",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "spender",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "value",
+              type: "uint256",
+            },
+          ],
+          name: "Approval",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "from",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "value",
+              type: "uint256",
+            },
+          ],
+          name: "Transfer",
+          type: "event",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "spender",
+              type: "address",
+            },
+          ],
+          name: "allowance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "spender",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "value",
+              type: "uint256",
+            },
+          ],
+          name: "approve",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "balanceOf",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "decimals",
+          outputs: [
+            {
+              internalType: "uint8",
+              name: "",
+              type: "uint8",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "name",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "symbol",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "totalSupply",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "value",
+              type: "uint256",
+            },
+          ],
+          name: "transfer",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "from",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "value",
+              type: "uint256",
+            },
+          ],
+          name: "transferFrom",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
       ];
-
-      const tokenWithSigner = new ethers.Contract(
-        tokenAddress,
-        tokenABI,
-        signer
+  
+      const contract = new ethers.Contract(tokenAddress, tokenAbi, provider);
+    
+      console.log("contract : ", contract);
+  
+      const decimals = await contract.decimals();
+      const balances = await contract.balanceOf(sender);
+  
+      console.log("balances : ", balances);
+  
+      const contractWithSigner = contract.connect(signer);
+  
+      const tx = await contractWithSigner.transfer(
+        receiver,
+        ethers.utils.parseUnits(amountToSend, decimals)
       );
-      const approveTx = await tokenWithSigner.approve(sendAddress, amount);
-      await approveTx.wait();
-
-      const provider = new ethers.providers.JsonRpcProvider(
-        "https://eth-sepolia.g.alchemy.com/v2/NP2an-FMSHKAB1qV7U0vBZP6w4g5Yiir"
-      );
-      const nonce = await provider.getTransactionCount(
-        await signer.getAddress()
-      );
-      const feeData: any = await provider.getFeeData();
+  
       const chainId = (await provider.getNetwork()).chainId;
-
-      const txRequest = await tokenWithSigner.populateTransaction.transferFrom(
-        await signer.getAddress(),
-        sendAddress,
-        amount
-      );
-
-      const gasLimit = await provider.estimateGas({
-        from: await signer.getAddress(),
-        to: tokenAddress,
-        data: txRequest.data,
-        value: 0,
-        nonce,
-        maxFeePerGas: feeData.maxFeePerGas,
-        maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+  
+      const {
+        accessList,
+        blockHash,
+        blockNumber,
+        confirmations,
+        wait,
+        creates,
+        ...filteredTx
+      } = tx;
+  
+      const data = {
+        ...filteredTx,
         chainId,
-      });
-
-      const tx = {
-        type: 2,
-        chainId,
-        nonce,
-        from: await signer.getAddress(),
-        to: tokenAddress,
-        data: txRequest.data,
-        value: 0,
-        maxFeePerGas: feeData.maxFeePerGas,
-        maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
-        gasLimit: gasLimit,
-        accessList: [],
       };
-
-      console.log("Gas Limit: ", gasLimit.toString());
-
-      const ic = icblast({ ic: true });
-      const EcdsaPublicKeyActor = await ic("vrqyr-saaaa-aaaan-qzn4q-cai");
-
-      const sig = await EcdsaPublicKeyActor.sign_with_ecdsa({
-        key_id: { name: "insecure_test_key_1", curve: { secp256k1: null } },
-        derivation_path: [],
-        message_hash: Array.from(
-          ethers.utils.arrayify(
-            ethers.utils.keccak256(ethers.utils.serializeTransaction(tx))
-          )
-        ),
-      });
-
-      const signature = new Uint8Array(sig.signature);
-      const r = ethers.utils.hexlify(signature.slice(0, 32));
-      const s = ethers.utils.hexlify(signature.slice(32, 64));
-      const v = 27 + (sig.recovery_id ?? 0);
-      const rawTx = ethers.utils.serializeTransaction(tx, { v, r, s });
-
+      
+      console.log("data  : ", data);
+  
+      const v = data.v;
+      const r = data.r;
+      const s = data.s;
+      const rawTx = ethers.utils.serializeTransaction(data, { v, r, s });
+  
       const txHashRes = await actor.send_raw_transaction(rawTx);
       console.log("Response:", txHashRes);
     } catch (error) {
-      console.log("Error:", error);
+      console.log(" error : ", error);
     }
   };
 
